@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Ad Handler and Cookie Manager</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Smart Ad Handler</h1>
+        
+        <div class="toggle-container">
+            <span>Enable Extension</span>
+            <label class="toggle-switch">
+                <input type="checkbox" id="extensionToggle">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div class="stats">
+            <p>Ads Handled: <span id="adsHandled">0</span></p>
+            <p>Cookies Managed: <span id="cookiesManaged">0</span></p>
+        </div>
+
+        <button id="openOptions">Open Options</button>
+    </div>
+
+    <script src="../node_modules/webextension-polyfill/dist/browser-polyfill.min.js"></script>
+    <script src="popup.js"></script>
+</body>
+</html>

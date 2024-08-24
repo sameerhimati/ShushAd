@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Ad Handler and Cookie Manager Options</title>
+    <link rel="stylesheet" href="options.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Smart Ad Handler and Cookie Manager Options</h1>
+        
+        <div class="option-group">
+            <h2>Ad Handling</h2>
+            <label>
+                <input type="checkbox" id="handleYouTubeAds"> Handle YouTube Ads
+            </label>
+            <label>
+                <input type="checkbox" id="muteYouTubeAds"> Mute YouTube Ads
+            </label>
+            <label>
+                <input type="checkbox" id="attemptSkipYouTubeAds"> Attempt to Skip YouTube Ads
+            </label>
+            <label>
+                <input type="checkbox" id="hideYouTubeOverlayAds"> Hide YouTube Overlay Ads
+            </label>
+            <label>
+                <input type="checkbox" id="handleFacebookAds"> Handle Facebook Ads
+            </label>
+            <label>
+                <input type="checkbox" id="handleVideoAds"> Handle Video Ads on Other Sites
+            </label>
+            <label>
+                <input type="checkbox" id="handleStaticAds"> Handle Static Ads
+            </label>
+        </div>
+
+        <div class="option-group">
+            <h2>Cookie Management</h2>
+            <label>
+                <input type="checkbox" id="handleCookieConsent"> Handle Cookie Consent Popups
+            </label>
+            <label>
+                <input type="checkbox" id="automaticallyHandleConsent"> Automatically Handle Consent (Minimal Settings)
+            </label>
+            <label>
+                <input type="checkbox" id="clearNonEssentialCookies"> Clear Non-Essential Cookies
+            </label>
+        </div>
+
+        <div class="option-group">
+            <h2>Advanced Settings</h2>
+            <label>
+                <input type="checkbox" id="enableLogging"> Enable Logging (for troubleshooting)
+            </label>
+        </div>
+
+        <button id="save">Save Settings</button>
+
+        <div id="status" class="status"></div>
+    </div>
+
+    <script src="../node_modules/webextension-polyfill/dist/browser-polyfill.min.js"></script>
+    <script src="options.js"></script>
+</body>
+</html>
