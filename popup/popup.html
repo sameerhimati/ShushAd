@@ -3,30 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Ad Handler and Cookie Manager</title>
+    <title>Smart Ad Handler</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="popup.css">
+    <script src="/node_modules/webextension-polyfill/dist/browser-polyfill.min.js"></script>
 </head>
-<body>
-    <div class="container">
-        <h1>Smart Ad Handler</h1>
-        
-        <div class="toggle-container">
-            <span>Enable Extension</span>
+<body class="bg-gray-100 text-gray-800 p-4">
+    <div class="container mx-auto max-w-md bg-white rounded-lg shadow-md p-6">
+        <h1 class="text-2xl font-bold mb-4 text-center">Smart Ad Handler</h1>
+        <div class="flex justify-between items-center mb-6">
+            <span class="text-lg">Enable Extension</span>
             <label class="toggle-switch">
                 <input type="checkbox" id="extensionToggle">
                 <span class="slider"></span>
             </label>
         </div>
-
-        <div class="stats">
-            <p>Ads Handled: <span id="adsHandled">0</span></p>
-            <p>Cookies Managed: <span id="cookiesManaged">0</span></p>
+        <div class="grid grid-cols-2 gap-4 mb-6">
+            <div class="bg-blue-100 p-3 rounded">
+                <p class="text-sm">Ads Handled</p>
+                <p class="text-2xl font-bold" id="adsHandled">0</p>
+            </div>
+            <div class="bg-green-100 p-3 rounded">
+                <p class="text-sm">Cookies Managed</p>
+                <p class="text-2xl font-bold" id="cookiesManaged">0</p>
+            </div>
         </div>
-
-        <button id="openOptions">Open Options</button>
+        <button id="openOptions" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition duration-300">Open Options</button>
     </div>
-
-    <script src="../node_modules/webextension-polyfill/dist/browser-polyfill.min.js"></script>
-    <script src="popup.js"></script>
+    <script type="module" src="popup.js"></script>
 </body>
 </html>

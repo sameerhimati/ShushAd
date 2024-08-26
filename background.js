@@ -1,7 +1,7 @@
-import { initializeState, updateState, getState } from './state.js';
 import { logger } from './utils/logger.js';
+import { initializeState, updateState, getState } from './utils/state.js';
 
-class BackgroundScript {
+class BackgroundManager {
   constructor() {
     this.init();
   }
@@ -45,6 +45,12 @@ class BackgroundScript {
           const state = getState();
           sendResponse({ success: true, data: state });
           break;
+          case 'adBlocked':
+            await this.handleAdBlocked();
+            break;
+          case 'cookieManaged':
+            await this.handleCookieManaged();
+            break;
         default:
           sendResponse({ success: false, error: 'Unknown action' });
       }
@@ -76,6 +82,21 @@ class BackgroundScript {
     logger.log('Settings updated', newSettings);
   }
 
+  async incrementStat(statName) {
+    const result = await chrome.storage.sync.get('stats');
+    const stats = result.stats || { adsHandled: 0, cookiesManaged: 0 };
+    stats[statName]++;
+    await chrome.storage.sync.set({ stats });
+  }
+  
+  async handleAdBlocked() {
+    await this.incrementStat('adsHandled');
+  }
+  
+  async handleCookieManaged() {
+    await this.incrementStat('cookiesManaged');
+  }
+
   async injectContentScript(tabId, url) {
     try {
       await chrome.scripting.executeScript({
@@ -90,29 +111,58 @@ class BackgroundScript {
 
   setupDeclarativeNetRequest() {
     chrome.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds: [1],
-      addRules: [{
-        id: 1,
-        priority: 1,
-        action: {
-          type: 'block'
+      removeRuleIds: [1, 2],
+      addRules: [
+        {
+          id: 1,
+          priority: 1,
+          action: { type: 'block' },
+          condition: {
+            urlFilter: '||example.com/ads/*',
+            resourceTypes: ['script', 'image']
+          }
         },
-        condition: {
-          urlFilter: '||example.com/ads/*',
-          resourceTypes: ['script', 'image']
+        {
+          id: 2,
+          priority: 1,
+          action: { type: 'redirect', redirect: { extensionPath: '/resources/1x1.png' } },
+          condition: {
+            urlFilter: '||example.com/tracking/*',
+            resourceTypes: ['image']
+          }
         }
-      }]
+      ]
+    });
+    logger.log('Declarative Net Request rules updated');
+  }
+
+  async muteTab(tabId, mute) {
+    await chrome.tabs.update(tabId, { muted: mute });
+    logger.log(`Tab ${tabId} ${mute ? 'muted' : 'unmuted'}`);
+  }
+
+  setupMessageListeners() {
+    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+      if (request.action === 'muteTab') {
+        this.muteTab(sender.tab.id, request.mute);
+      }
+      // ... other message handling ...
     });
   }
 }
 
-// Error handling
-window.addEventListener('error', (event) => {
-  logger.error('Unhandled error:', event.error);
-});
+async function updateAdDetectionModel() {
+  // Fetch the latest model from your server
+  const response = await fetch('https://your-server.com/latest-ad-model.json');
+  const modelData = await response.json();
+  
+  // Save the model to the extension's storage
+  await chrome.storage.local.set({ adDetectionModel: modelData });
+  
+  logger.log('Ad detection model updated');
+}
 
-window.addEventListener('unhandledrejection', (event) => {
-  logger.error('Unhandled promise rejection:', event.reason);
-});
+// Call this function periodically, e.g., once a day
+setInterval(updateAdDetectionModel, 24 * 60 * 60 * 1000);
 
-const backgroundScript = new BackgroundScript();
+const backgroundManager = new BackgroundManager();

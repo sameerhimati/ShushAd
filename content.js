@@ -1,8 +1,54 @@
-import { adManager } from './adHandler/adManager.js';
-import { cookieManager } from './cookieManager/cookieHandler.js';
-import { createDOMObserver } from './utils/domObserver.js';
-import { logger } from './utils/logger.js';
-import { initAntiDetection } from './utils/antiDetection.js';
+const { logger, state, AdManager, CookieManager, handlers, utils } = window.extensionAPI;
+
+let settings = {};
+let adManager, cookieManager;
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'pageLoad') {
+    initializeContentScript();
+  }
+});
+
+async function initializeContentScript() {
+  settings = await getSettings();
+  adManager = new AdManager(settings);
+  cookieManager = new CookieManager(settings);
+  setupAdHandling();
+  setupCookieHandling();
+  utils.initAntiDetection();
+  chrome.runtime.sendMessage({ action: 'setupMessageListeners' });
+}
+
+function setupAdHandling() {
+  if (settings.muteAds) {
+    adManager.muteAds();
+  }
+  if (settings.skipAds) {
+    adManager.setupAdSkipping();
+  }
+  if (settings.hideAds) {
+    adManager.hideAds();
+  }
+  adManager.observeNewAds();
+}
+
+function setupCookieHandling() {
+  if (settings.handleCookies) {
+    cookieManager.handleCookieConsent();
+    cookieManager.setupConsentObserver();
+  }
+  if (settings.clearNonEssentialCookies) {
+    cookieManager.clearNonEssentialCookies();
+  }
+}
+
+async function getSettings() {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ action: 'getSettings' }, (response) => {
+      resolve(response.data);
+    });
+  });
+}
 
 class ContentScript {
   constructor() {
@@ -98,3 +144,43 @@ const contentScript = new ContentScript();
 window.debugAdHandler = () => {
   logger.log('Ad Handler Debug Info', adManager.getDebugInfo());
 };
+
+document.addEventListener('DOMContentLoaded', () => {
+  logger.log('DOM fully loaded and parsed');
+  
+  // Initialize the content script
+  initializeContentScript();
+  
+  // Perform initial ad and cookie handling
+  if (settings.handleAds) {
+    adManager.handleAds(document.body);
+  }
+  if (settings.handleCookies) {
+    cookieManager.handleCookieConsent(document.body);
+  }
+  
+  // Set up mutation observer for dynamic content
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.type === 'childList') {
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            if (settings.handleAds) {
+              adManager.handleAds(node);
+            }
+            if (settings.handleCookies) {
+              cookieManager.handleCookieConsent(node);
+            }
+          }
+        });
+      }
+    });
+  });
+  
+  observer.observe(document.body, { childList: true, subtree: true });
+  
+  logger.log('Content script initialization complete');
+});
+
+
+

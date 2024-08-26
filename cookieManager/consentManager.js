@@ -1,6 +1,3 @@
-import { logger } from '../utils/logger.js';
-import { randomizeAction } from '../utils/antiDetection.js';
-
 class ConsentManager {
   constructor() {
     this.consentButtonSelectors = [
@@ -22,15 +19,18 @@ class ConsentManager {
   }
 
   buildDecisionTree() {
-    // This is a simplified decision tree. In a real-world scenario,
-    // this would be more complex and based on machine learning models.
     return {
-      'has_accept_all': {
-        true: 'reject',
+      'has_reject_all': {
+        true: 'reject_all',
         false: {
-          'has_reject_all': {
-            true: 'reject_all',
-            false: 'do_nothing'
+          'has_manage_preferences': {
+            true: 'manage_preferences',
+            false: {
+              'has_reject': {
+                true: 'reject',
+                false: 'do_nothing'
+              }
+            }
           }
         }
       }
@@ -66,8 +66,10 @@ class ConsentManager {
   }
 
   makeDecision(button) {
-    const hasAcceptAll = !!button.closest('form').querySelector('button:contains("Accept All")');
-    const hasRejectAll = !!button.closest('form').querySelector('button:contains("Reject All")');
+    const form = button.closest('form') || button.closest('[role="dialog"]') || document;
+    const hasRejectAll = !!form.querySelector('button:contains("Reject All")');
+    const hasManagePreferences = !!form.querySelector('button:contains("Manage"), button:contains("Preferences")');
+    const hasReject = !!form.querySelector('button:contains("Reject")');
 
     let currentNode = this.decisionTree;
     while (typeof currentNode !== 'string') {
@@ -79,20 +81,58 @@ class ConsentManager {
   }
 
   async executeDecision(decision, button) {
+    const form = button.closest('form') || button.closest('[role="dialog"]') || document;
     switch (decision) {
-      case 'reject':
-        await this.clickConsentButton(button);
-        break;
       case 'reject_all':
-        const rejectAllButton = button.closest('form').querySelector('button:contains("Reject All")');
+        const rejectAllButton = form.querySelector('button:contains("Reject All")');
         if (rejectAllButton) {
           await this.clickConsentButton(rejectAllButton);
+        }
+        break;
+      case 'manage_preferences':
+        const manageButton = form.querySelector('button:contains("Manage"), button:contains("Preferences")');
+        if (manageButton) {
+          await this.clickConsentButton(manageButton);
+          await this.handlePreferencesPage(form);
+        }
+        break;
+      case 'reject':
+        const rejectButton = form.querySelector('button:contains("Reject")');
+        if (rejectButton) {
+          await this.clickConsentButton(rejectButton);
         }
         break;
       case 'do_nothing':
         logger.log('No clear consent decision, doing nothing');
         break;
     }
+  }
+
+  async handlePreferencesPage(form) {
+    // Wait for preferences to load
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Uncheck all non-essential checkboxes
+    const checkboxes = form.querySelectorAll('input[type="checkbox"]');
+    for (const checkbox of checkboxes) {
+      const label = checkbox.closest('label') || document.querySelector(`label[for="${checkbox.id}"]`);
+      if (label && !this.isEssentialCookie(label.textContent)) {
+        if (checkbox.checked) {
+          await this.clickConsentButton(checkbox);
+        }
+      }
+    }
+
+    // Find and click the save/confirm button
+    const saveButton = form.querySelector('button:contains("Save"), button:contains("Confirm")');
+    if (saveButton) {
+      await this.clickConsentButton(saveButton);
+    }
+  }
+
+  isEssentialCookie(text) {
+    const essentialKeywords = ['necessary', 'essential', 'required', 'functional'];
+    return essentialKeywords.some(keyword => text.toLowerCase().includes(keyword));
   }
 
   async clickConsentButton(button) {
@@ -126,5 +166,3 @@ class ConsentManager {
     return observer;
   }
 }
-
-export const consentManager = new ConsentManager();

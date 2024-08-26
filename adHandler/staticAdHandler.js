@@ -1,6 +1,4 @@
-import { logger } from '../utils/logger.js';
-import { randomizeAction } from '../utils/antiDetection.js';
-import { BloomFilter } from '../utils/bloomFilter.js';
+const { logger, utils, mediaController } = window.extensionAPI;
 
 class StaticAdHandler {
   constructor() {
@@ -12,15 +10,8 @@ class StaticAdHandler {
       'img[src*="ad"], img[src*="banner"]',
       '[id*="sponsor"], [class*="sponsor"]'
     ];
-    this.adUrlFilter = new BloomFilter(1000, 0.01);
-    this.initAdUrlFilter();
     this.adPlaceholderTemplate = this.createAdPlaceholderTemplate();
-  }
-
-  async initAdUrlFilter() {
-    // In a real-world scenario, this list would be much larger and possibly fetched from a server
-    const adUrls = ['example.com/ads', 'ads.example.com', 'adserver.example.com'];
-    adUrls.forEach(url => this.adUrlFilter.add(url));
+    this.adDetectionModel = null;
   }
 
   createAdPlaceholderTemplate() {
@@ -32,6 +23,10 @@ class StaticAdHandler {
 
   async handle(element, settings) {
     if (!settings.handleStaticAds) return;
+
+    if (!this.adDetectionModel) {
+      this.adDetectionModel = await this.loadAdDetectionModel();
+    }
 
     const staticAds = element.querySelectorAll(this.staticAdSelectors.join(', '));
     
@@ -49,19 +44,69 @@ class StaticAdHandler {
         observer.observe(ad);
       }
     });
-
+    chrome.runtime.sendMessage({ action: 'adBlocked' });
     logger.log('Set up observers for static ads', { count: staticAds.length });
+  }
+
+  async loadAdDetectionModel() {
+    try {
+      return await tf.loadLayersModel('chrome-extension://' + chrome.runtime.id + '/models/ad_detection_model.json');
+    } catch (error) {
+      logger.error('Error loading ad detection model:', error);
+      return null;
+    }
   }
 
   isLikelyAd(element) {
     const adKeywords = ['ad', 'sponsor', 'promo', 'banner'];
     const elementString = element.outerHTML.toLowerCase();
-    return adKeywords.some(keyword => elementString.includes(keyword)) || this.isAdUrl(element);
+    
+    // Use machine learning model to predict if the element is an ad
+    const features = this.extractFeatures(element);
+    const prediction = this.adDetectionModel.predict(features);
+    const isAdPrediction = prediction.dataSync()[0] > 0.5;
+
+    // Combine ML prediction with keyword matching and heuristics
+    return isAdPrediction || 
+           adKeywords.some(keyword => elementString.includes(keyword)) || 
+           this.hasAdCharacteristics(element);
   }
 
-  isAdUrl(element) {
+  extractFeatures(element) {
+    // Extract relevant features from the element for the ML model
+    return tf.tensor2d([
+      [
+        element.offsetWidth,
+        element.offsetHeight,
+        element.tagName === 'IMG' ? 1 : 0,
+        element.tagName === 'IFRAME' ? 1 : 0,
+        element.id.toLowerCase().includes('ad') ? 1 : 0,
+        element.className.toLowerCase().includes('ad') ? 1 : 0,
+        // Add more features as needed
+      ]
+    ]);
+  }
+
+  hasAdCharacteristics(element) {
+    // Check for common ad characteristics
     const url = element.src || element.href;
-    return url && this.adUrlFilter.test(new URL(url).hostname);
+    if (url) {
+      const urlObj = new URL(url);
+      if (urlObj.searchParams.has('ad') || urlObj.pathname.includes('ad')) {
+        return true;
+      }
+    }
+
+    // Check for common ad sizes
+    const commonAdSizes = [[300, 250], [728, 90], [160, 600], [320, 50]];
+    if (commonAdSizes.some(([width, height]) => 
+        element.offsetWidth === width && element.offsetHeight === height)) {
+      return true;
+    }
+
+    // Add more heuristics as needed
+
+    return false;
   }
 
   async handleStaticAd(ad, settings) {
@@ -75,7 +120,7 @@ class StaticAdHandler {
   }
 
   async hideStaticAd(ad) {
-    await randomizeAction(() => {
+    await utils.randomizeAction(() => {
       ad.style.display = 'none';
     });
     logger.log('Hid static ad', { element: ad });

@@ -1,6 +1,4 @@
-import { logger } from '../utils/logger.js';
-import { mediaController } from '../utils/mediaController.js';
-import { randomizeAction } from '../utils/antiDetection.js';
+const { logger, utils } = window.extensionAPI;
 
 class FacebookHandler {
   constructor() {
@@ -20,6 +18,7 @@ class FacebookHandler {
     await this.handleVisibleSponsored(element, settings);
     
     logger.log('Handled Facebook ads');
+    chrome.runtime.sendMessage({ action: 'adBlocked' });
   }
 
   initVirtualScroller(element) {

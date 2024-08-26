@@ -1,5 +1,4 @@
-import { logger } from '../utils/logger.js';
-import { consentManager } from './consentManager.js';
+const { logger, consentManager } = window.extensionAPI;
 
 class CookieHandler {
   constructor() {
@@ -69,18 +68,8 @@ class CookieHandler {
   }
 
   isEssentialCookie(cookie) {
-    return this.essentialCookies.has(cookie.name.toLowerCase()) || this.isStoredEssentialCookie(cookie);
-  }
-
-  async isStoredEssentialCookie(cookie) {
-    return new Promise((resolve) => {
-      const transaction = this.cookieDb.transaction(['cookies'], 'readonly');
-      const objectStore = transaction.objectStore('cookies');
-      const request = objectStore.get(cookie.name);
-      request.onsuccess = (event) => {
-        resolve(!!event.target.result);
-      };
-    });
+    const essentialKeywords = ['session', 'login', 'auth', 'security', 'csrf', 'token'];
+    return essentialKeywords.some(keyword => cookie.name.toLowerCase().includes(keyword));
   }
 
   async batchRemoveCookies(cookies) {
@@ -98,6 +87,7 @@ class CookieHandler {
         name: cookie.name
       }, (details) => {
         logger.log('Removed cookie', { name: cookie.name, domain: cookie.domain });
+        chrome.runtime.sendMessage({ action: 'cookieManaged' });
         resolve(details);
       });
     });

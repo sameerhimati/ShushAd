@@ -85,16 +85,11 @@ class Logger {
     }
   
     sendLogToBackground(logEntry) {
-      if (navigator.sendBeacon) {
-        const blob = new Blob([JSON.stringify(logEntry)], { type: 'application/json' });
-        navigator.sendBeacon(chrome.runtime.getURL('log'), blob);
-      } else {
         chrome.runtime.sendMessage({
           action: 'addLog',
           log: logEntry
         }).catch(error => console.error('Error sending log to background:', error));
       }
-    }
   }
   
   export const logger = new Logger();

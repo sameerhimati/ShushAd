@@ -1,4 +1,4 @@
-import { logger } from './logger.js';
+import { logger } from '../utils/logger.js';
 
 class PopupManager {
   constructor() {
@@ -15,11 +15,12 @@ class PopupManager {
     await this.loadInitialState();
     this.setupEventListeners();
     this.renderQuickSettings();
+    this.startStatsUpdater();
   }
 
   async loadInitialState() {
     try {
-      const result = await browser.storage.sync.get(['enabled', 'stats', 'settings']);
+      const result = await chrome.storage.sync.get(['enabled', 'stats', 'settings']);
       this.extensionToggle.checked = result.enabled !== false; // Default to true if not set
       this.updateStats(result.stats || this.stats);
       this.settings = result.settings || {};
@@ -30,8 +31,10 @@ class PopupManager {
 
   setupEventListeners() {
     this.extensionToggle.addEventListener('change', () => this.toggleExtension());
-    this.openOptionsButton.addEventListener('click', () => browser.runtime.openOptionsPage());
-    browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    this.openOptionsButton.addEventListener('click', () => {
+      chrome.runtime.openOptionsPage();
+    });
+    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       if (request.action === 'updateStats') {
         this.updateStats(request.stats);
       }
@@ -40,12 +43,13 @@ class PopupManager {
 
   async toggleExtension() {
     try {
-      await browser.storage.sync.set({ enabled: this.extensionToggle.checked });
-      const tabs = await browser.tabs.query({});
-      tabs.forEach((tab) => {
-        browser.tabs.sendMessage(tab.id, { 
-          action: 'toggleExtension', 
-          enabled: this.extensionToggle.checked 
+      await chrome.storage.sync.set({ enabled: this.extensionToggle.checked });
+      chrome.tabs.query({}, (tabs) => {
+        tabs.forEach((tab) => {
+          chrome.tabs.sendMessage(tab.id, { 
+            action: 'toggleExtension', 
+            enabled: this.extensionToggle.checked 
+          });
         });
       });
     } catch (error) {
@@ -55,8 +59,8 @@ class PopupManager {
 
   updateStats(stats) {
     this.stats = stats;
-    this.adsHandledSpan.textContent = stats.adsHandled;
-    this.cookiesManagedSpan.textContent = stats.cookiesManaged;
+    this.adsHandledSpan.textContent = stats.adsHandled.toLocaleString();
+    this.cookiesManagedSpan.textContent = stats.cookiesManaged.toLocaleString();
   }
 
   renderQuickSettings() {
@@ -96,17 +100,35 @@ class PopupManager {
   async updateQuickSetting(key, value) {
     try {
       this.settings[key] = value;
-      await browser.storage.sync.set({ settings: this.settings });
-      const tabs = await browser.tabs.query({});
-      tabs.forEach((tab) => {
-        browser.tabs.sendMessage(tab.id, { 
+      await chrome.storage.sync.set({ settings: this.settings });
+      const tabs = await chrome.tabs.query({});
+      const updatePromises = tabs.map(tab => 
+        chrome.tabs.sendMessage(tab.id, { 
           action: 'updateSettings', 
           settings: { [key]: value } 
-        });
-      });
+        }).catch(error => {
+          // Ignore errors for inactive tabs
+          if (error.message !== "Could not establish connection. Receiving end does not exist.") {
+            throw error;
+          }
+        })
+      );
+      await Promise.all(updatePromises);
+      logger.info(`Quick setting updated: ${key} = ${value}`);
     } catch (error) {
       logger.error('Error updating quick setting:', error);
     }
+  }
+
+  startStatsUpdater() {
+    setInterval(async () => {
+      try {
+        const result = await chrome.storage.sync.get('stats');
+        this.updateStats(result.stats || this.stats);
+      } catch (error) {
+        logger.error('Error updating stats:', error);
+      }
+    }, 1000); // Update every second
   }
 }
 

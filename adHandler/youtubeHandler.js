@@ -1,6 +1,4 @@
-import { logger } from '../utils/logger.js';
-import { mediaController } from '../utils/mediaController.js';
-import { randomizeAction } from '../utils/antiDetection.js';
+const { logger, utils, mediaController } = window.extensionAPI;
 
 class YouTubeHandler {
   constructor() {
@@ -110,6 +108,7 @@ class YouTubeHandler {
         await randomizeAction(() => muteButton.click());
         this.state.isMuted = true;
         logger.log('Clicked mute button for YouTube ad');
+        chrome.runtime.sendMessage({ action: 'adBlocked' });
       }
     }
   }
@@ -138,7 +137,14 @@ class YouTubeHandler {
     const delay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
     
     await new Promise(resolve => setTimeout(resolve, delay));
-    await randomizeAction(() => element.click());
+    await randomizeAction(() => {
+      const clickEvent = new MouseEvent('click', {
+        view: window,
+        bubbles: true,
+        cancelable: true
+      });
+      element.dispatchEvent(clickEvent);
+    });
   }
 
   disconnect() {
@@ -149,5 +155,6 @@ class YouTubeHandler {
     }
   }
 }
+
 
 export const youtubeHandler = new YouTubeHandler();

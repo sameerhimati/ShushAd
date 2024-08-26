@@ -1,5 +1,3 @@
-import { logger } from './logger.js';
-
 const decoyElements = [
   { tag: 'div', id: 'ad-container', innerHTML: '<p>Advertisement</p>', style: 'display: none;' },
   { tag: 'script', textContent: 'console.log("Ad script loaded");' },

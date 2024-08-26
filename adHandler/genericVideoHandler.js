@@ -1,6 +1,4 @@
-import { logger } from '../utils/logger.js';
-import { mediaController } from '../utils/mediaController.js';
-import { randomizeAction } from '../utils/antiDetection.js';
+const { logger, utils, mediaController } = window.extensionAPI;
 
 class GenericVideoHandler {
   constructor() {
@@ -34,6 +32,7 @@ class GenericVideoHandler {
     }
 
     logger.log('Handled generic video ads', { count: videoAds.length });
+    chrome.runtime.sendMessage({ action: 'adBlocked' });
   }
 
   isLikelyAd(element) {
@@ -43,8 +42,9 @@ class GenericVideoHandler {
   }
 
   async handleVideoAd(ad, settings) {
-    if (settings.muteVideoAds) {
+    if (settings.muteAds) {
       await this.muteVideoAd(ad);
+      chrome.runtime.sendMessage({ action: 'muteTab', mute: true });
     }
     if (settings.attemptSkipAds) {
       await this.attemptSkipAd(ad);
@@ -54,6 +54,7 @@ class GenericVideoHandler {
     }
 
     this.observeAdChanges(ad, settings);
+    this.observeAdEnd(ad, settings);
   }
 
   async muteVideoAd(ad) {
@@ -94,6 +95,22 @@ class GenericVideoHandler {
     });
 
     observer.observe(ad, { childList: true, subtree: true });
+  }
+
+  observeAdEnd(ad, settings) {
+    const observer = new MutationObserver(async (mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === 'childList' && mutation.removedNodes.length > 0) {
+          if (!ad.isConnected) {
+            chrome.runtime.sendMessage({ action: 'muteTab', mute: false });
+            observer.disconnect();
+            break;
+          }
+        }
+      }
+    });
+
+    observer.observe(ad.parentNode, { childList: true });
   }
 }
 

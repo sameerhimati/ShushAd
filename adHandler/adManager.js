@@ -1,18 +1,13 @@
-import { youtubeHandler } from './youtubeHandler.js';
-import { facebookHandler } from './facebookHandler.js';
-import { genericVideoHandler } from './genericVideoHandler.js';
-import { staticAdHandler } from './staticAdHandler.js';
-import { addDecoyElements, randomizeAction } from '../utils/antiDetection.js';
-import { logger } from '../utils/logger.js';
+const { logger, handlers, utils, GenericVideoHandler, StaticAdHandler } = window.extensionAPI;
 
-class AdManager {
-  constructor() {
+export class AdManager {
+  constructor(settings) {
     this.currentDomain = window.location.hostname;
     this.handlers = new Map([
-      ['www.youtube.com', youtubeHandler],
-      ['www.facebook.com', facebookHandler]
+      ['www.youtube.com', new handlers.YouTubeHandler()],
+      ['www.facebook.com', new handlers.FacebookHandler()]
     ]);
-    this.settings = {};
+    this.settings = settings;
     this.cache = new Map();
   }
 
@@ -32,6 +27,8 @@ class AdManager {
   }
 
   async handleGenericSite(element) {
+    const genericVideoHandler = new GenericVideoHandler();
+    const staticAdHandler = new StaticAdHandler();
     await genericVideoHandler.handle(element, this.settings);
     await staticAdHandler.handle(element, this.settings);
   }

@@ -42,6 +42,8 @@ class DOMObserver {
 
   async processMutationBatch(mutations) {
     const addedNodes = new Set();
+    const modifiedNodes = new Set();
+
     mutations.forEach(mutation => {
       if (mutation.type === 'childList') {
         mutation.addedNodes.forEach(node => {
@@ -49,10 +51,17 @@ class DOMObserver {
             addedNodes.add(node);
           }
         });
+      } else if (mutation.type === 'attributes') {
+        modifiedNodes.add(mutation.target);
       }
     });
 
-    const promises = Array.from(this.callbacks).map(callback => callback(Array.from(addedNodes)));
+    const promises = Array.from(this.callbacks).map(callback => 
+      callback({
+        addedNodes: Array.from(addedNodes),
+        modifiedNodes: Array.from(modifiedNodes)
+      })
+    );
     await Promise.all(promises);
   }
 
